@@ -51,6 +51,7 @@ class Sagan(nn.Module):
         self.h = nn.Conv2d(input_size,attention_size, 1, stride=1)
         self.attention_size = attention_size
         #.attention_map = #torch.matmul()
+        self.gamma = nn.Parameter(torch.zeros(1))
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
@@ -68,15 +69,26 @@ class Sagan(nn.Module):
         
         g = self.g(self.feature_map(x))
         h = self.h(self.feature_map(x))
-        #print(f.shape)
-        #print(g.shape)
-        #print(h.shape)
+        
+        #print("f: ", f.shape)
+        #print("g: ", g.shape)
+        #print("h: ", h.shape)
         #print(torch.bmm(f.view(batch,-1,width*height).permute(0,2,1),g.view(batch,-1,width*height)).shape)
 
+
         mult_fg =  torch.bmm(f.view(batch,-1,width*height).permute(0,2,1),g.view(batch,-1,width*height))
+        #print("f*g: ", mult_fg.shape)
         attention = self.softmax(mult_fg)
+        #print("softmax-1: ", attention.shape)
         out = torch.bmm(h.view(batch,-1,width*height),attention.permute(0,2,1))
+        #print("Output before view: ", out.shape)
+
         out = out.view(batch,self.attention_size,width,height)
+        #print("View hack: ", out.shape)
+        #exit(0)
+
+        out = self.gamma*out + x
+
         return out
 
 
