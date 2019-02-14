@@ -42,13 +42,13 @@ def weights_init_normal(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 
-class Sagan(nn.Module):
+class AttentionLayer(nn.Module):
     def __init__(self, input_size, attention_size):
-        super(Sagan, self).__init__()
-        self.feature_map = nn.Conv2d(1,input_size,kernel_size=1,stride=1)
-        self.f = nn.Conv2d(input_size,attention_size//8, 1, stride=1)
-        self.g = nn.Conv2d(input_size,attention_size//8, 1, stride=1) 
-        self.h = nn.Conv2d(input_size,attention_size, 1, stride=1)
+        super(AttentionLayer, self).__init__()
+        self.feature_map = nn.Conv2d(input_size,attention_size,kernel_size=1,stride=1)
+        self.f = nn.Conv2d(attention_size,attention_size//8, 1, stride=1)
+        self.g = nn.Conv2d(attention_size,attention_size//8, 1, stride=1) 
+        self.h = nn.Conv2d(attention_size,attention_size, 1, stride=1)
         self.attention_size = attention_size
         #.attention_map = #torch.matmul()
         self.gamma = nn.Parameter(torch.zeros(1))
@@ -75,7 +75,7 @@ class Sagan(nn.Module):
         out = torch.bmm(h.view(batch,-1,width*height),attention.permute(0,2,1))
         out = out.view(batch,self.attention_size,width,height)
 
-        out = self.gamma*out + x
+        out = self.gamma*out + self.feature_map(x)
         return out
 
 
@@ -99,9 +99,11 @@ class Generator(nn.Module):
             nn.Conv2d(128, 64, 3, stride=1, padding=1),
             nn.BatchNorm2d(64, 0.8),
             nn.LeakyReLU(0.2, inplace=True),
+            AttentionLayer(input_size=64,attention_size=64),
             nn.Conv2d(64, opt.channels, 3, stride=1, padding=1),
             nn.Tanh()
         )
+
 
     def forward(self, z):
         out = self.l1(z)
@@ -125,8 +127,10 @@ class Discriminator(nn.Module):
             *discriminator_block(opt.channels, 16, bn=False),
             *discriminator_block(16, 32),
             *discriminator_block(32, 64),
+            AttentionLayer(input_size=64,attention_size=64),
             *discriminator_block(64, 128),
         )
+
 
         # The height and width of downsampled image
         ds_size = opt.img_size // 2**4
@@ -200,11 +204,10 @@ for epoch in range(opt.n_epochs):
         gen_imgs = generator(z)
 
         #print(gen_imgs.shape)
-        x = Sagan(input_size=1, attention_size=16).cuda() ## pass batch size as input dim
-        
-        x(gen_imgs)
+        #x = Sagan(input_size=opt.channels, attention_size=16).cuda() ## pass batch size as input dim
+        #x(gen_imgs)
 
-        exit(0)
+        #exit(0)
 
 
 
