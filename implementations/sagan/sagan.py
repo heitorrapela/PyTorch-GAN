@@ -45,7 +45,7 @@ def weights_init_normal(m):
 class Sagan(nn.Module):
     def __init__(self, input_size, attention_size):
         super(Sagan, self).__init__()
-        self.feature_map = nn.Conv2d(1,input_size,kernel_size=3,stride=1)
+        self.feature_map = nn.Conv2d(1,input_size,kernel_size=1,stride=1)
         self.f = nn.Conv2d(input_size,attention_size//8, 1, stride=1)
         self.g = nn.Conv2d(input_size,attention_size//8, 1, stride=1) 
         self.h = nn.Conv2d(input_size,attention_size, 1, stride=1)
@@ -61,7 +61,7 @@ class Sagan(nn.Module):
         height = x.size(3)
         
         f = self.f(self.feature_map(x))
-
+        
         batch = f.size(0)
         channels = f.size(1)
         width = f.size(2)
@@ -70,25 +70,12 @@ class Sagan(nn.Module):
         g = self.g(self.feature_map(x))
         h = self.h(self.feature_map(x))
         
-        #print("f: ", f.shape)
-        #print("g: ", g.shape)
-        #print("h: ", h.shape)
-        #print(torch.bmm(f.view(batch,-1,width*height).permute(0,2,1),g.view(batch,-1,width*height)).shape)
-
-
         mult_fg =  torch.bmm(f.view(batch,-1,width*height).permute(0,2,1),g.view(batch,-1,width*height))
-        #print("f*g: ", mult_fg.shape)
         attention = self.softmax(mult_fg)
-        #print("softmax-1: ", attention.shape)
         out = torch.bmm(h.view(batch,-1,width*height),attention.permute(0,2,1))
-        #print("Output before view: ", out.shape)
-
         out = out.view(batch,self.attention_size,width,height)
-        #print("View hack: ", out.shape)
-        #exit(0)
 
         out = self.gamma*out + x
-
         return out
 
 
@@ -99,6 +86,8 @@ class Generator(nn.Module):
 
         self.init_size = opt.img_size // 4
         self.l1 = nn.Sequential(nn.Linear(opt.latent_dim, 128*self.init_size**2))
+
+
 
         self.conv_blocks = nn.Sequential(
             nn.BatchNorm2d(128),
@@ -212,8 +201,7 @@ for epoch in range(opt.n_epochs):
 
         #print(gen_imgs.shape)
         x = Sagan(input_size=1, attention_size=16).cuda() ## pass batch size as input dim
-        #print(x)
-        #print(gen_imgs.shape)
+        
         x(gen_imgs)
 
         exit(0)
