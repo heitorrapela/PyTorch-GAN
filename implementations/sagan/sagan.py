@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torch.autograd import Variable
 
+from spectral import SpectralNorm
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
@@ -19,8 +20,8 @@ os.makedirs('images', exist_ok=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_epochs', type=int, default=200, help='number of epochs of training')
-parser.add_argument('--batch_size', type=int, default=64, help='size of the batches')
-parser.add_argument('--lr', type=float, default=0.0002, help='adam: learning rate')
+parser.add_argument('--batch_size', type=int, default=32, help='size of the batches')
+parser.add_argument('--lr', type=float, default=0.0001, help='adam: learning rate')
 parser.add_argument('--b1', type=float, default=0.5, help='adam: decay of first order momentum of gradient')
 parser.add_argument('--b2', type=float, default=0.999, help='adam: decay of first order momentum of gradient')
 parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
@@ -92,15 +93,15 @@ class Generator(nn.Module):
         self.conv_blocks = nn.Sequential(
             nn.BatchNorm2d(128),
             nn.Upsample(scale_factor=2),
-            nn.Conv2d(128, 128, 3, stride=1, padding=1),
+            SpectralNorm(nn.Conv2d(128, 128, 3, stride=1, padding=1)),
             nn.BatchNorm2d(128, 0.8),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Upsample(scale_factor=2),
-            nn.Conv2d(128, 64, 3, stride=1, padding=1),
+            SpectralNorm(nn.Conv2d(128, 64, 3, stride=1, padding=1)),
             nn.BatchNorm2d(64, 0.8),
             nn.LeakyReLU(0.2, inplace=True),
             AttentionLayer(input_size=64,attention_size=64),
-            nn.Conv2d(64, opt.channels, 3, stride=1, padding=1),
+            SpectralNorm(nn.Conv2d(64, opt.channels, 3, stride=1, padding=1)),
             nn.Tanh()
         )
 
@@ -116,7 +117,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         def discriminator_block(in_filters, out_filters, bn=True):
-            block = [   nn.Conv2d(in_filters, out_filters, 3, 2, 1),
+            block = [   SpectralNorm(nn.Conv2d(in_filters, out_filters, 3, 2, 1)),
                         nn.LeakyReLU(0.2, inplace=True),
                         nn.Dropout2d(0.25)]
             if bn:
@@ -157,8 +158,8 @@ if cuda:
     adversarial_loss.cuda()
 
 # Initialize weights
-generator.apply(weights_init_normal)
-discriminator.apply(weights_init_normal)
+#generator.apply(weights_init_normal)
+#discriminator.apply(weights_init_normal)
 
 # Configure data loader
 os.makedirs('./mnist', exist_ok=True)
@@ -173,7 +174,7 @@ dataloader = torch.utils.data.DataLoader(
 
 # Optimizers
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
+optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr*4, betas=(opt.b1, opt.b2))
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
